@@ -1167,8 +1167,8 @@
                 const { width, height } = this;
                 const centerX = width / 2;
                 const centerY = height / 2;
-                const maxRadius = Math.min(width, height) / 2 - 20;
                 const minRadius = 30;
+                const maxRadius = Math.max(Math.min(width, height) / 2 - 20, minRadius + 10);
 
                 const layers = 4;
                 for (let layer = 0; layer < layers; layer++) {
@@ -1208,18 +1208,14 @@
                     this.ctx.shadowColor = 'transparent';
                 });
 
-                const centerRadius = 25 + (this.activeNotes.size / 8) * 10;
+                const centerRadius = Math.max(25 + (this.activeNotes.size / 8) * 10, 15);
                 this.ctx.beginPath();
                 this.ctx.arc(centerX, centerY, centerRadius, 0, Math.PI * 2);
                 
-                // Cache center gradient
-                const centerGradientKey = `circle-center-${Math.floor(centerRadius)}`;
-                const centerGradient = this.getOrCreateGradient(centerGradientKey, () => {
-                    const g = this.ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, centerRadius);
-                    g.addColorStop(0, '#764ba2');
-                    g.addColorStop(1, '#667eea');
-                    return g;
-                });
+                // Create gradient with current centerRadius (don't cache since radius changes)
+                const centerGradient = this.ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, centerRadius);
+                centerGradient.addColorStop(0, '#764ba2');
+                centerGradient.addColorStop(1, '#667eea');
                 this.ctx.fillStyle = centerGradient;
                 this.ctx.fill();
 
