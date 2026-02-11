@@ -883,13 +883,26 @@
         class Visualizer {
             constructor(canvas, debugEl) {
                 this.canvas = canvas;
-                this.ctx = canvas.getContext('2d');
+                this.ctx = canvas.getContext('2d', {
+                    alpha: false,
+                    desynchronized: true
+                });
+                this.ctx.imageSmoothingEnabled = true;
+                this.ctx.imageSmoothingQuality = 'high';
                 this.debugEl = debugEl;
                 this.mode = 'bars';
                 this.activeNotes = new Map();
                 this.bars = new Array(88).fill(0);
+                this.smoothedBars = new Array(88).fill(0);
                 this.noteCount = 0;
                 this.isActive = false;
+                this.lastTime = performance.now();
+                this.frameCount = 0;
+                this.fpsTime = 0;
+                this.fps = 0;
+                this.gradientCache = new Map();
+                this.maxCacheSize = 50; // Limit gradient cache size
+                this.TARGET_FRAME_TIME = 16.67; // Milliseconds per frame at 60 FPS
                 this.resize();
             }
 
@@ -898,13 +911,37 @@
                 const rect = this.canvas.getBoundingClientRect();
                 this.canvas.width = rect.width * dpr;
                 this.canvas.height = rect.height * dpr;
+                
+                // Reset all transformations and apply scale only once
+                this.ctx.setTransform(1, 0, 0, 1, 0, 0);
                 this.ctx.scale(dpr, dpr);
+                
+                // Reapply antialiasing settings after resize
+                this.ctx.imageSmoothingEnabled = true;
+                this.ctx.imageSmoothingQuality = 'high';
+                
                 this.width = rect.width;
                 this.height = rect.height;
+                
+                // Clear gradient cache on resize
+                this.gradientCache.clear();
             }
 
             setMode(mode) {
                 this.mode = mode;
+            }
+            
+            getOrCreateGradient(key, createFn) {
+                if (!this.gradientCache.has(key)) {
+                    // Limit cache size to prevent memory issues
+                    if (this.gradientCache.size >= this.maxCacheSize) {
+                        // Remove oldest entry (first key)
+                        const firstKey = this.gradientCache.keys().next().value;
+                        this.gradientCache.delete(firstKey);
+                    }
+                    this.gradientCache.set(key, createFn());
+                }
+                return this.gradientCache.get(key);
             }
 
             addNote(note, velocity) {
@@ -932,31 +969,52 @@
                 }
             }
 
-            update() {
+            update(deltaTime) {
+                const decayRate = 0.95;
+                const decayFactor = Math.pow(decayRate, deltaTime / this.TARGET_FRAME_TIME);
+                const smoothingFactor = 0.15;
+                
                 for (let i = 0; i < this.bars.length; i++) {
-                    this.bars[i] *= 0.92;
-                    if (this.bars[i] < 1) this.bars[i] = 0;
+                    // Smooth interpolation
+                    this.smoothedBars[i] += (this.bars[i] - this.smoothedBars[i]) * smoothingFactor;
+                    
+                    // Apply decay
+                    this.bars[i] *= decayFactor;
+                    if (this.bars[i] < 0.5) this.bars[i] = 0;
                 }
             }
 
             draw() {
                 if (!this.isActive) return;
 
+                const currentTime = performance.now();
+                const deltaTime = currentTime - this.lastTime;
+                this.lastTime = currentTime;
+                
+                // Calculate FPS
+                this.frameCount++;
+                this.fpsTime += deltaTime;
+                if (this.fpsTime >= 1000) {
+                    this.fps = Math.round((this.frameCount * 1000) / this.fpsTime);
+                    this.frameCount = 0;
+                    this.fpsTime = 0;
+                }
+
                 const { width, height } = this;
                 
                 this.ctx.fillStyle = '#ffffff';
                 this.ctx.fillRect(0, 0, width, height);
 
-                this.update();
+                this.update(deltaTime);
 
                 if (this.debugEl) {
-                    this.debugEl.textContent = `Активных: ${this.activeNotes.size} | Всего: ${this.noteCount}`;
+                    this.debugEl.textContent = `Активных: ${this.activeNotes.size} | Всего: ${this.noteCount} | FPS: ${this.fps}`;
                 }
 
                 if (this.mode === 'bars') {
                     this.drawBars();
                 } else if (this.mode === 'wave') {
-                    this.drawWave();
+                    this.drawWave(currentTime);
                 } else if (this.mode === 'circle') {
                     this.drawCircle();
                 }
@@ -978,7 +1036,7 @@
                 }
                 
                 for (let i = 0; i < barCount; i++) {
-                    const barHeight = (this.bars[i] / 127) * height * 0.9;
+                    const barHeight = (this.smoothedBars[i] / 127) * height * 0.9;
                     
                     if (barHeight > 1) {
                         const hue = (i / barCount) * 280;
@@ -986,9 +1044,14 @@
                         this.ctx.fillStyle = `hsla(${hue}, 70%, 50%, 0.15)`;
                         this.ctx.fillRect(i * barWidth + 1, height - barHeight + 3, barWidth - 2, barHeight);
                         
-                        const gradient = this.ctx.createLinearGradient(0, height - barHeight, 0, height);
-                        gradient.addColorStop(0, `hsl(${hue}, 85%, 65%)`);
-                        gradient.addColorStop(1, `hsl(${hue}, 75%, 55%)`);
+                        // Cache gradient per bar type (use rounded height for caching)
+                        const gradientKey = `bar-${Math.floor(barHeight / 10)}-${hue}`;
+                        const gradient = this.getOrCreateGradient(gradientKey, () => {
+                            const g = this.ctx.createLinearGradient(0, height - barHeight, 0, height);
+                            g.addColorStop(0, `hsl(${hue}, 85%, 65%)`);
+                            g.addColorStop(1, `hsl(${hue}, 75%, 55%)`);
+                            return g;
+                        });
                         
                         this.ctx.fillStyle = gradient;
                         this.ctx.fillRect(i * barWidth + 1, height - barHeight, barWidth - 2, barHeight);
@@ -1019,7 +1082,7 @@
                 });
             }
 
-            drawWave() {
+            drawWave(currentTime) {
                 const { width, height } = this;
                 const centerY = height / 2;
                 
@@ -1040,20 +1103,24 @@
                 this.ctx.beginPath();
                 this.ctx.lineWidth = 4;
                 
-                const gradient = this.ctx.createLinearGradient(0, 0, width, 0);
-                gradient.addColorStop(0, '#667eea');
-                gradient.addColorStop(0.5, '#764ba2');
-                gradient.addColorStop(1, '#f093fb');
-                this.ctx.strokeStyle = gradient;
+                // Cache stroke gradient
+                const strokeGradient = this.getOrCreateGradient('wave-stroke', () => {
+                    const g = this.ctx.createLinearGradient(0, 0, width, 0);
+                    g.addColorStop(0, '#667eea');
+                    g.addColorStop(0.5, '#764ba2');
+                    g.addColorStop(1, '#f093fb');
+                    return g;
+                });
+                this.ctx.strokeStyle = strokeGradient;
 
                 const points = 150;
                 const step = width / points;
-                const time = Date.now() * 0.002;
+                const time = currentTime * 0.002;
                 
                 for (let i = 0; i <= points; i++) {
                     const x = i * step;
-                    const barIndex = Math.floor((i / points) * this.bars.length);
-                    const barValue = this.bars[barIndex] / 127;
+                    const barIndex = Math.floor((i / points) * this.smoothedBars.length);
+                    const barValue = this.smoothedBars[barIndex] / 127;
                     
                     const wave1 = Math.sin(i * 0.05 + time) * amplitude * 0.6;
                     const wave2 = Math.sin(i * 0.1 - time * 1.5) * amplitude * 0.4;
@@ -1074,15 +1141,20 @@
                 this.ctx.lineTo(0, height);
                 this.ctx.closePath();
                 
-                const fillGradient = this.ctx.createLinearGradient(0, centerY - amplitude, 0, height);
-                fillGradient.addColorStop(0, 'rgba(102, 126, 234, 0.4)');
-                fillGradient.addColorStop(1, 'rgba(118, 75, 162, 0.1)');
+                // Cache fill gradient
+                const fillGradientKey = `wave-fill-${Math.floor(amplitude / 10)}`;
+                const fillGradient = this.getOrCreateGradient(fillGradientKey, () => {
+                    const g = this.ctx.createLinearGradient(0, centerY - amplitude, 0, height);
+                    g.addColorStop(0, 'rgba(102, 126, 234, 0.4)');
+                    g.addColorStop(1, 'rgba(118, 75, 162, 0.1)');
+                    return g;
+                });
                 this.ctx.fillStyle = fillGradient;
                 this.ctx.fill();
 
                 this.activeNotes.forEach((data, note) => {
                     const x = ((note - 21) / 88) * width;
-                    const y = centerY + Math.sin(Date.now() * 0.005 + note) * amplitude;
+                    const y = centerY + Math.sin(currentTime * 0.005 + note) * amplitude;
                     const hue = ((note - 21) / 88) * 280;
                     
                     this.ctx.shadowBlur = 15;
@@ -1093,7 +1165,9 @@
                     this.ctx.fillStyle = `hsl(${hue}, 90%, 60%)`;
                     this.ctx.fill();
                     
+                    // Properly reset shadow
                     this.ctx.shadowBlur = 0;
+                    this.ctx.shadowColor = 'transparent';
                 });
             }
 
@@ -1101,8 +1175,8 @@
                 const { width, height } = this;
                 const centerX = width / 2;
                 const centerY = height / 2;
-                const maxRadius = Math.min(width, height) / 2 - 20;
                 const minRadius = 30;
+                const maxRadius = Math.max(Math.min(width, height) / 2 - 20, minRadius + 10);
 
                 const layers = 4;
                 for (let layer = 0; layer < layers; layer++) {
@@ -1137,12 +1211,16 @@
                     this.ctx.fillStyle = `hsl(${hue}, 90%, 60%)`;
                     this.ctx.fill();
                     
+                    // Properly reset shadow
                     this.ctx.shadowBlur = 0;
+                    this.ctx.shadowColor = 'transparent';
                 });
 
-                const centerRadius = 25 + (this.activeNotes.size / 8) * 10;
+                const centerRadius = Math.max(25 + (this.activeNotes.size / 8) * 10, 15);
                 this.ctx.beginPath();
                 this.ctx.arc(centerX, centerY, centerRadius, 0, Math.PI * 2);
+                
+                // Create gradient with current centerRadius (don't cache since radius changes)
                 const centerGradient = this.ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, centerRadius);
                 centerGradient.addColorStop(0, '#764ba2');
                 centerGradient.addColorStop(1, '#667eea');
