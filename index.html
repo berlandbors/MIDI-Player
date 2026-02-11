@@ -1,1 +1,1088 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDI Player</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2em;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9ff;
+        }
+
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #f0f1ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #764ba2;
+            background: #e8e9ff;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
+        .upload-text {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .file-info {
+            background: #f8f9ff;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .file-info.active {
+            display: block;
+        }
+
+        .file-name {
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover:not(:disabled) {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .visualizer {
+            width: 100%;
+            height: 150px;
+            background: #f8f9ff;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            display: none;
+            overflow: hidden;
+        }
+
+        .visualizer.active {
+            display: block;
+        }
+
+        #canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .progress-container {
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .progress-container.active {
+            display: block;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.1s ease;
+        }
+
+        .time-display {
+            display: flex;
+            justify-content: space-between;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .status {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            min-height: 20px;
+        }
+
+        .slider-control {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .slider-control.active {
+            display: flex;
+        }
+
+        .slider-label {
+            color: #667eea;
+            font-weight: bold;
+            min-width: 100px;
+        }
+
+        .slider-value {
+            min-width: 60px;
+            text-align: right;
+            color: #764ba2;
+            font-weight: bold;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            height: 6px;
+            border-radius: 5px;
+            outline: none;
+            -webkit-appearance: none;
+            background: #e0e0e0;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            border: none;
+        }
+
+        .info-box {
+            background: #f8f9ff;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 0.85em;
+            color: #666;
+        }
+
+        .instrument-selector {
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .instrument-selector.active {
+            display: block;
+        }
+
+        .instrument-selector label {
+            display: block;
+            color: #667eea;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .instrument-selector select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            font-size: 1em;
+            background: white;
+            cursor: pointer;
+        }
+
+        .visualization-mode {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .visualization-mode.active {
+            display: flex;
+        }
+
+        .viz-btn {
+            flex: 1;
+            padding: 10px;
+            background: #e0e0e0;
+            color: #666;
+            border-radius: 10px;
+            font-size: 0.9em;
+        }
+
+        .viz-btn.selected {
+            background: #667eea;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎹 MIDI Player</h1>
+        
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">🎵</div>
+            <div class="upload-text">
+                Нажмите или перетащите MIDI файл сюда
+            </div>
+        </div>
+        
+        <input type="file" id="fileInput" accept=".mid,.midi">
+        
+        <div class="file-info" id="fileInfo">
+            <div class="file-name" id="fileName"></div>
+            <div class="info-box" id="midiInfo"></div>
+        </div>
+
+        <div class="visualizer" id="visualizer">
+            <canvas id="canvas"></canvas>
+        </div>
+
+        <div class="visualization-mode" id="visualizationMode">
+            <button class="viz-btn selected" data-mode="bars">📊 Столбцы</button>
+            <button class="viz-btn" data-mode="wave">🌊 Волна</button>
+            <button class="viz-btn" data-mode="circle">⭕ Круг</button>
+        </div>
+
+        <div class="instrument-selector" id="instrumentSelector">
+            <label for="waveType">🎼 Тип звука:</label>
+            <select id="waveType">
+                <option value="sine">Синусоида (мягкий)</option>
+                <option value="square">Квадрат (резкий)</option>
+                <option value="sawtooth">Пила (яркий)</option>
+                <option value="triangle" selected>Треугольник (сбалансированный)</option>
+            </select>
+        </div>
+
+        <div class="slider-control" id="volumeControl">
+            <span class="slider-label">🔊 Громкость:</span>
+            <input type="range" id="volumeSlider" min="0" max="100" value="30">
+            <span class="slider-value" id="volumeValue">30%</span>
+        </div>
+
+        <div class="slider-control" id="tempoControl">
+            <span class="slider-label">⏱️ Темп:</span>
+            <input type="range" id="tempoSlider" min="25" max="200" value="100">
+            <span class="slider-value" id="tempoValue">100%</span>
+        </div>
+        
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar" id="progressBar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="time-display">
+                <span id="currentTime">0:00</span>
+                <span id="totalTime">0:00</span>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button id="playBtn" disabled>
+                <span>▶</span> Играть
+            </button>
+            <button id="pauseBtn" disabled>
+                <span>⏸</span> Пауза
+            </button>
+            <button id="stopBtn" disabled>
+                <span>⏹</span> Стоп
+            </button>
+        </div>
+        
+        <div class="status" id="status">Загрузите MIDI файл для начала</div>
+    </div>
+
+    <script>
+        // ===== MIDI ПАРСЕР =====
+        class MIDIParser {
+            constructor(arrayBuffer) {
+                this.data = new DataView(arrayBuffer);
+                this.pos = 0;
+            }
+
+            readString(length) {
+                let str = '';
+                for (let i = 0; i < length; i++) {
+                    str += String.fromCharCode(this.data.getUint8(this.pos++));
+                }
+                return str;
+            }
+
+            readUInt32() {
+                const val = this.data.getUint32(this.pos);
+                this.pos += 4;
+                return val;
+            }
+
+            readUInt16() {
+                const val = this.data.getUint16(this.pos);
+                this.pos += 2;
+                return val;
+            }
+
+            readUInt8() {
+                return this.data.getUint8(this.pos++);
+            }
+
+            readVarLen() {
+                let value = 0;
+                let byte;
+                do {
+                    byte = this.readUInt8();
+                    value = (value << 7) | (byte & 0x7f);
+                } while (byte & 0x80);
+                return value;
+            }
+
+            parse() {
+                const header = this.readString(4);
+                if (header !== 'MThd') {
+                    throw new Error('Неверный MIDI файл');
+                }
+
+                const headerLength = this.readUInt32();
+                const format = this.readUInt16();
+                const trackCount = this.readUInt16();
+                const timeDivision = this.readUInt16();
+
+                const tracks = [];
+
+                for (let i = 0; i < trackCount; i++) {
+                    const track = this.parseTrack();
+                    if (track.events.length > 0) {
+                        tracks.push(track);
+                    }
+                }
+
+                return { format, trackCount, timeDivision, tracks };
+            }
+
+            parseTrack() {
+                const header = this.readString(4);
+                if (header !== 'MTrk') {
+                    throw new Error('Неверный трек');
+                }
+
+                const trackLength = this.readUInt32();
+                const trackEnd = this.pos + trackLength;
+                const events = [];
+                let runningStatus = 0;
+                let absoluteTime = 0;
+
+                while (this.pos < trackEnd) {
+                    const deltaTime = this.readVarLen();
+                    absoluteTime += deltaTime;
+
+                    let status = this.data.getUint8(this.pos);
+
+                    if (status < 0x80) {
+                        status = runningStatus;
+                    } else {
+                        this.pos++;
+                        if (status < 0xF0) {
+                            runningStatus = status;
+                        }
+                    }
+
+                    const eventType = status >> 4;
+                    const channel = status & 0x0F;
+
+                    if (eventType === 0x9) {
+                        const note = this.readUInt8();
+                        const velocity = this.readUInt8();
+                        if (velocity > 0) {
+                            events.push({ type: 'noteOn', time: absoluteTime, note, velocity, channel });
+                        } else {
+                            events.push({ type: 'noteOff', time: absoluteTime, note, channel });
+                        }
+                    } else if (eventType === 0x8) {
+                        const note = this.readUInt8();
+                        const velocity = this.readUInt8();
+                        events.push({ type: 'noteOff', time: absoluteTime, note, channel });
+                    } else if (eventType === 0xB || eventType === 0xC || eventType === 0xD) {
+                        this.readUInt8();
+                        if (eventType !== 0xC && eventType !== 0xD) {
+                            this.readUInt8();
+                        }
+                    } else if (eventType === 0xE) {
+                        this.readUInt8();
+                        this.readUInt8();
+                    } else if (status === 0xFF || status === 0xF0 || status === 0xF7) {
+                        if (status === 0xFF) {
+                            this.readUInt8();
+                        }
+                        const length = this.readVarLen();
+                        this.pos += length;
+                    } else if (eventType === 0xA) {
+                        this.readUInt8();
+                        this.readUInt8();
+                    }
+                }
+
+                return { events };
+            }
+        }
+
+        // ===== VISUALIZER =====
+        class Visualizer {
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d');
+                this.mode = 'bars';
+                this.activeNotes = new Map();
+                this.analyser = null;
+                this.dataArray = null;
+                this.resize();
+            }
+
+            resize() {
+                this.canvas.width = this.canvas.offsetWidth;
+                this.canvas.height = this.canvas.offsetHeight;
+            }
+
+            setAnalyser(analyser) {
+                this.analyser = analyser;
+                this.analyser.fftSize = 256;
+                this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+            }
+
+            setMode(mode) {
+                this.mode = mode;
+            }
+
+            addNote(note, velocity) {
+                this.activeNotes.set(note, { velocity, time: Date.now() });
+            }
+
+            removeNote(note) {
+                this.activeNotes.delete(note);
+            }
+
+            draw() {
+                const { width, height } = this.canvas;
+                this.ctx.clearRect(0, 0, width, height);
+
+                if (this.analyser) {
+                    this.analyser.getByteFrequencyData(this.dataArray);
+                }
+
+                if (this.mode === 'bars') {
+                    this.drawBars();
+                } else if (this.mode === 'wave') {
+                    this.drawWave();
+                } else if (this.mode === 'circle') {
+                    this.drawCircle();
+                }
+            }
+
+            drawBars() {
+                const { width, height } = this.canvas;
+                
+                if (this.dataArray) {
+                    const barWidth = width / this.dataArray.length;
+                    
+                    for (let i = 0; i < this.dataArray.length; i++) {
+                        const barHeight = (this.dataArray[i] / 255) * height;
+                        const hue = (i / this.dataArray.length) * 360;
+                        
+                        this.ctx.fillStyle = `hsl(${hue}, 70%, 60%)`;
+                        this.ctx.fillRect(i * barWidth, height - barHeight, barWidth - 2, barHeight);
+                    }
+                } else {
+                    // Fallback: показываем активные ноты
+                    const noteArray = Array.from(this.activeNotes.entries());
+                    const barWidth = width / 88; // 88 клавиш на пианино
+                    
+                    noteArray.forEach(([note, data]) => {
+                        const x = ((note - 21) / 88) * width;
+                        const barHeight = (data.velocity / 127) * height;
+                        const hue = ((note - 21) / 88) * 360;
+                        
+                        this.ctx.fillStyle = `hsl(${hue}, 70%, 60%)`;
+                        this.ctx.fillRect(x, height - barHeight, barWidth - 2, barHeight);
+                    });
+                }
+            }
+
+            drawWave() {
+                const { width, height } = this.canvas;
+                this.ctx.beginPath();
+                this.ctx.lineWidth = 3;
+                
+                const gradient = this.ctx.createLinearGradient(0, 0, width, 0);
+                gradient.addColorStop(0, '#667eea');
+                gradient.addColorStop(1, '#764ba2');
+                this.ctx.strokeStyle = gradient;
+
+                if (this.dataArray) {
+                    const sliceWidth = width / this.dataArray.length;
+                    let x = 0;
+
+                    for (let i = 0; i < this.dataArray.length; i++) {
+                        const v = this.dataArray[i] / 255;
+                        const y = v * height;
+
+                        if (i === 0) {
+                            this.ctx.moveTo(x, y);
+                        } else {
+                            this.ctx.lineTo(x, y);
+                        }
+
+                        x += sliceWidth;
+                    }
+                } else {
+                    // Fallback
+                    const noteArray = Array.from(this.activeNotes.values());
+                    const sliceWidth = width / 100;
+                    
+                    for (let i = 0; i < 100; i++) {
+                        const avgVelocity = noteArray.length > 0 
+                            ? noteArray.reduce((sum, n) => sum + n.velocity, 0) / noteArray.length / 127
+                            : 0;
+                        const y = height / 2 + Math.sin(i * 0.1 + Date.now() * 0.005) * avgVelocity * height * 0.4;
+                        
+                        if (i === 0) {
+                            this.ctx.moveTo(i * sliceWidth, y);
+                        } else {
+                            this.ctx.lineTo(i * sliceWidth, y);
+                        }
+                    }
+                }
+
+                this.ctx.stroke();
+            }
+
+            drawCircle() {
+                const { width, height } = this.canvas;
+                const centerX = width / 2;
+                const centerY = height / 2;
+                const maxRadius = Math.min(width, height) / 2 - 10;
+
+                if (this.dataArray) {
+                    const angleStep = (Math.PI * 2) / this.dataArray.length;
+                    
+                    this.ctx.beginPath();
+                    
+                    for (let i = 0; i < this.dataArray.length; i++) {
+                        const value = this.dataArray[i] / 255;
+                        const radius = 20 + value * (maxRadius - 20);
+                        const angle = i * angleStep;
+                        
+                        const x = centerX + Math.cos(angle) * radius;
+                        const y = centerY + Math.sin(angle) * radius;
+                        
+                        if (i === 0) {
+                            this.ctx.moveTo(x, y);
+                        } else {
+                            this.ctx.lineTo(x, y);
+                        }
+                        
+                        const hue = (i / this.dataArray.length) * 360;
+                        this.ctx.strokeStyle = `hsl(${hue}, 70%, 60%)`;
+                    }
+                    
+                    this.ctx.closePath();
+                    this.ctx.lineWidth = 3;
+                    this.ctx.stroke();
+                    
+                    // Внутренний круг
+                    this.ctx.beginPath();
+                    this.ctx.arc(centerX, centerY, 20, 0, Math.PI * 2);
+                    this.ctx.fillStyle = '#667eea';
+                    this.ctx.fill();
+                } else {
+                    // Fallback
+                    const noteArray = Array.from(this.activeNotes.entries());
+                    
+                    noteArray.forEach(([note, data]) => {
+                        const angle = ((note - 21) / 88) * Math.PI * 2;
+                        const radius = 20 + (data.velocity / 127) * (maxRadius - 20);
+                        const x = centerX + Math.cos(angle) * radius;
+                        const y = centerY + Math.sin(angle) * radius;
+                        
+                        this.ctx.beginPath();
+                        this.ctx.arc(x, y, 5, 0, Math.PI * 2);
+                        const hue = ((note - 21) / 88) * 360;
+                        this.ctx.fillStyle = `hsl(${hue}, 70%, 60%)`;
+                        this.ctx.fill();
+                    });
+                    
+                    // Центральный круг
+                    this.ctx.beginPath();
+                    this.ctx.arc(centerX, centerY, 15, 0, Math.PI * 2);
+                    this.ctx.fillStyle = '#667eea';
+                    this.ctx.fill();
+                }
+            }
+
+            clear() {
+                this.activeNotes.clear();
+            }
+        }
+
+        // ===== MIDI ПЛЕЕР =====
+        class MIDIPlayer {
+            constructor(visualizer) {
+                this.audioContext = null;
+                this.gainNode = null;
+                this.analyser = null;
+                this.midiData = null;
+                this.isPlaying = false;
+                this.startTime = 0;
+                this.pausedTime = 0;
+                this.scheduledNotes = new Map();
+                this.waveType = 'triangle';
+                this.tempo = 1.0;
+                this.visualizer = visualizer;
+            }
+
+            init() {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                this.gainNode = this.audioContext.createGain();
+                this.analyser = this.audioContext.createAnalyser();
+                
+                this.gainNode.connect(this.analyser);
+                this.analyser.connect(this.audioContext.destination);
+                this.gainNode.gain.value = 0.3;
+                
+                if (this.visualizer) {
+                    this.visualizer.setAnalyser(this.analyser);
+                }
+            }
+
+            loadMIDI(arrayBuffer) {
+                const parser = new MIDIParser(arrayBuffer);
+                this.midiData = parser.parse();
+                return this.midiData;
+            }
+
+            midiNoteToFrequency(note) {
+                return 440 * Math.pow(2, (note - 69) / 12);
+            }
+
+            play() {
+                if (!this.audioContext) {
+                    this.init();
+                }
+
+                this.isPlaying = true;
+                this.startTime = this.audioContext.currentTime - this.pausedTime;
+
+                this.scheduleAllNotes();
+            }
+
+            scheduleAllNotes() {
+                this.stopAllNotes();
+
+                const { tracks, timeDivision } = this.midiData;
+                const tickDuration = (0.0005 / this.tempo);
+
+                tracks.forEach((track, trackIndex) => {
+                    track.events.forEach(event => {
+                        const eventTime = this.startTime + (event.time * tickDuration);
+
+                        if (eventTime < this.audioContext.currentTime) return;
+
+                        if (event.type === 'noteOn') {
+                            setTimeout(() => {
+                                if (this.isPlaying) {
+                                    this.playNote(event.note, event.velocity, trackIndex);
+                                    if (this.visualizer) {
+                                        this.visualizer.addNote(event.note, event.velocity);
+                                    }
+                                }
+                            }, (eventTime - this.audioContext.currentTime) * 1000);
+                        } else if (event.type === 'noteOff') {
+                            setTimeout(() => {
+                                if (this.isPlaying) {
+                                    this.stopNote(event.note, trackIndex);
+                                    if (this.visualizer) {
+                                        this.visualizer.removeNote(event.note);
+                                    }
+                                }
+                            }, (eventTime - this.audioContext.currentTime) * 1000);
+                        }
+                    });
+                });
+            }
+
+            playNote(midiNote, velocity, trackIndex) {
+                const key = `${midiNote}-${trackIndex}`;
+                
+                if (this.scheduledNotes.has(key)) {
+                    this.stopNote(midiNote, trackIndex);
+                }
+
+                const oscillator = this.audioContext.createOscillator();
+                const noteGain = this.audioContext.createGain();
+
+                oscillator.type = this.waveType;
+                oscillator.frequency.value = this.midiNoteToFrequency(midiNote);
+
+                const volume = (velocity / 127) * 0.3;
+                noteGain.gain.value = volume;
+
+                oscillator.connect(noteGain);
+                noteGain.connect(this.gainNode);
+
+                oscillator.start();
+                
+                this.scheduledNotes.set(key, { oscillator, noteGain });
+            }
+
+            stopNote(midiNote, trackIndex) {
+                const key = `${midiNote}-${trackIndex}`;
+                const note = this.scheduledNotes.get(key);
+
+                if (note) {
+                    const { oscillator, noteGain } = note;
+                    const now = this.audioContext.currentTime;
+                    
+                    noteGain.gain.setValueAtTime(noteGain.gain.value, now);
+                    noteGain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                    
+                    try {
+                        oscillator.stop(now + 0.1);
+                    } catch (e) {}
+                    
+                    this.scheduledNotes.delete(key);
+                }
+            }
+
+            stopAllNotes() {
+                this.scheduledNotes.forEach(({ oscillator }) => {
+                    try {
+                        oscillator.stop();
+                    } catch (e) {}
+                });
+                this.scheduledNotes.clear();
+                if (this.visualizer) {
+                    this.visualizer.clear();
+                }
+            }
+
+            pause() {
+                this.isPlaying = false;
+                this.pausedTime = this.audioContext.currentTime - this.startTime;
+                this.stopAllNotes();
+            }
+
+            stop() {
+                this.isPlaying = false;
+                this.pausedTime = 0;
+                this.stopAllNotes();
+            }
+
+            getDuration() {
+                if (!this.midiData) return 0;
+                
+                let maxTime = 0;
+                const tickDuration = (0.0005 / this.tempo);
+
+                this.midiData.tracks.forEach(track => {
+                    track.events.forEach(event => {
+                        const time = event.time * tickDuration;
+                        if (time > maxTime) maxTime = time;
+                    });
+                });
+
+                return maxTime;
+            }
+
+            setVolume(value) {
+                if (this.gainNode) {
+                    this.gainNode.gain.value = value;
+                }
+            }
+
+            setWaveType(type) {
+                this.waveType = type;
+            }
+
+            setTempo(tempo) {
+                this.tempo = tempo;
+            }
+        }
+
+        // ===== UI КОД =====
+        const canvas = document.getElementById('canvas');
+        const visualizer = new Visualizer(canvas);
+        const player = new MIDIPlayer(visualizer);
+        
+        let animationFrame = null;
+        let totalDuration = 0;
+
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const midiInfo = document.getElementById('midiInfo');
+        const playBtn = document.getElementById('playBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const status = document.getElementById('status');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const progressFill = document.getElementById('progressFill');
+        const currentTimeEl = document.getElementById('currentTime');
+        const totalTimeEl = document.getElementById('totalTime');
+        const volumeControl = document.getElementById('volumeControl');
+        const volumeSlider = document.getElementById('volumeSlider');
+        const volumeValue = document.getElementById('volumeValue');
+        const tempoControl = document.getElementById('tempoControl');
+        const tempoSlider = document.getElementById('tempoSlider');
+        const tempoValue = document.getElementById('tempoValue');
+        const instrumentSelector = document.getElementById('instrumentSelector');
+        const waveType = document.getElementById('waveType');
+        const visualizerEl = document.getElementById('visualizer');
+        const visualizationMode = document.getElementById('visualizationMode');
+
+        // Визуализация кнопок
+        document.querySelectorAll('.viz-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.viz-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                visualizer.setMode(btn.dataset.mode);
+            });
+        });
+
+        window.addEventListener('resize', () => visualizer.resize());
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) handleFile(file);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) handleFile(file);
+        });
+
+        volumeSlider.addEventListener('input', (e) => {
+            const value = e.target.value;
+            player.setVolume(value / 100);
+            volumeValue.textContent = value + '%';
+        });
+
+        tempoSlider.addEventListener('input', (e) => {
+            const value = e.target.value;
+            player.setTempo(value / 100);
+            tempoValue.textContent = value + '%';
+            
+            if (player.midiData) {
+                totalDuration = player.getDuration();
+                totalTimeEl.textContent = formatTime(totalDuration);
+            }
+        });
+
+        waveType.addEventListener('change', (e) => {
+            player.setWaveType(e.target.value);
+        });
+
+        async function handleFile(file) {
+            if (!file.name.match(/\.(mid|midi)$/i)) {
+                status.textContent = 'Ошибка: выберите MIDI файл';
+                return;
+            }
+
+            try {
+                status.textContent = 'Загрузка файла...';
+                const arrayBuffer = await file.arrayBuffer();
+                
+                const midiData = player.loadMIDI(arrayBuffer);
+                
+                fileName.textContent = `📄 ${file.name}`;
+                
+                let totalNotes = 0;
+                midiData.tracks.forEach(track => {
+                    const notes = track.events.filter(e => e.type === 'noteOn');
+                    totalNotes += notes.length;
+                });
+                
+                totalDuration = player.getDuration();
+                
+                midiInfo.textContent = `Длительность: ${formatTime(totalDuration)}, Треков: ${midiData.tracks.length}, Нот: ${totalNotes}`;
+                fileInfo.classList.add('active');
+                progressContainer.classList.add('active');
+                volumeControl.classList.add('active');
+                tempoControl.classList.add('active');
+                instrumentSelector.classList.add('active');
+                visualizerEl.classList.add('active');
+                visualizationMode.classList.add('active');
+                
+                playBtn.disabled = false;
+                totalTimeEl.textContent = formatTime(totalDuration);
+                status.textContent = 'Файл загружен! Нажмите "Играть" ▶';
+                
+            } catch (error) {
+                status.textContent = 'Ошибка при чтении MIDI файла: ' + error.message;
+                console.error('Ошибка:', error);
+            }
+        }
+
+        playBtn.addEventListener('click', () => {
+            player.play();
+            
+            playBtn.disabled = true;
+            pauseBtn.disabled = false;
+            stopBtn.disabled = false;
+            status.textContent = '🎵 Воспроизведение...';
+            
+            updateProgress();
+            animateVisualizer();
+        });
+
+        pauseBtn.addEventListener('click', () => {
+            player.pause();
+            
+            if (animationFrame) {
+                cancelAnimationFrame(animationFrame);
+            }
+            
+            playBtn.disabled = false;
+            pauseBtn.disabled = true;
+            status.textContent = '⏸ Пауза';
+        });
+
+        stopBtn.addEventListener('click', () => {
+            player.stop();
+            
+            if (animationFrame) {
+                cancelAnimationFrame(animationFrame);
+            }
+            
+            progressFill.style.width = '0%';
+            currentTimeEl.textContent = '0:00';
+            
+            playBtn.disabled = false;
+            pauseBtn.disabled = true;
+            stopBtn.disabled = true;
+            status.textContent = 'Остановлено';
+        });
+
+        function animateVisualizer() {
+            if (!player.isPlaying) return;
+            
+            visualizer.draw();
+            animationFrame = requestAnimationFrame(animateVisualizer);
+        }
+
+        function updateProgress() {
+            if (!player.isPlaying) return;
+            
+            const elapsed = player.audioContext.currentTime - player.startTime;
+            const progress = Math.min((elapsed / totalDuration) * 100, 100);
+            
+            progressFill.style.width = progress + '%';
+            currentTimeEl.textContent = formatTime(elapsed);
+            
+            if (progress >= 100) {
+                stopBtn.click();
+                status.textContent = 'Воспроизведение завершено ✓';
+            } else {
+                requestAnimationFrame(updateProgress);
+            }
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+    </script>
+</body>
+</html>
