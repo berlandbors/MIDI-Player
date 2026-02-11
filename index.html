@@ -901,6 +901,8 @@
                 this.fpsTime = 0;
                 this.fps = 0;
                 this.gradientCache = new Map();
+                this.maxCacheSize = 50; // Limit gradient cache size
+                this.TARGET_FRAME_TIME = 16.67; // Milliseconds per frame at 60 FPS
                 this.resize();
             }
 
@@ -931,6 +933,12 @@
             
             getOrCreateGradient(key, createFn) {
                 if (!this.gradientCache.has(key)) {
+                    // Limit cache size to prevent memory issues
+                    if (this.gradientCache.size >= this.maxCacheSize) {
+                        // Remove oldest entry (first key)
+                        const firstKey = this.gradientCache.keys().next().value;
+                        this.gradientCache.delete(firstKey);
+                    }
                     this.gradientCache.set(key, createFn());
                 }
                 return this.gradientCache.get(key);
@@ -963,7 +971,7 @@
 
             update(deltaTime) {
                 const decayRate = 0.95;
-                const decayFactor = Math.pow(decayRate, deltaTime / 16.67); // Normalized to 60 FPS
+                const decayFactor = Math.pow(decayRate, deltaTime / this.TARGET_FRAME_TIME);
                 const smoothingFactor = 0.15;
                 
                 for (let i = 0; i < this.bars.length; i++) {
