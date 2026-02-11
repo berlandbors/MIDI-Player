@@ -1,0 +1,2304 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDI Player Pro</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 700px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2em;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            border-bottom: 2px solid #e0e0e0;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            background: transparent;
+            border: none;
+            border-radius: 10px 10px 0 0;
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s ease;
+        }
+
+        .tab:hover {
+            background: #f0f1ff;
+        }
+
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9ff;
+        }
+
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #f0f1ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #764ba2;
+            background: #e8e9ff;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
+        .upload-text {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        #fileInput, #jsonFileInput {
+            display: none;
+        }
+
+        .file-info {
+            background: #f8f9ff;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .file-info.active {
+            display: block;
+        }
+
+        .file-name {
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        button:hover:not(:disabled) {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        button.secondary {
+            background: #f093fb;
+        }
+
+        button.secondary:hover:not(:disabled) {
+            background: #c86dd7;
+        }
+
+        .visualizer {
+            width: 100%;
+            height: 180px;
+            background: linear-gradient(135deg, #f8f9ff 0%, #e8e9ff 100%);
+            border: 2px solid #667eea;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            display: none;
+            overflow: hidden;
+            box-shadow: inset 0 2px 10px rgba(102, 126, 234, 0.1);
+            position: relative;
+        }
+
+        .visualizer.active {
+            display: block;
+        }
+
+        #canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .viz-debug {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            color: #667eea;
+            font-size: 11px;
+            font-family: monospace;
+            background: rgba(255,255,255,0.8);
+            padding: 4px 8px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+
+        .progress-container {
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .progress-container.active {
+            display: block;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.1s ease;
+        }
+
+        .time-display {
+            display: flex;
+            justify-content: space-between;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .status {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            min-height: 20px;
+        }
+
+        .slider-control {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .slider-control.active {
+            display: flex;
+        }
+
+        .slider-label {
+            color: #667eea;
+            font-weight: bold;
+            min-width: 100px;
+        }
+
+        .slider-value {
+            min-width: 60px;
+            text-align: right;
+            color: #764ba2;
+            font-weight: bold;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            height: 6px;
+            border-radius: 5px;
+            outline: none;
+            -webkit-appearance: none;
+            background: #e0e0e0;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            border: none;
+        }
+
+        .info-box {
+            background: #f8f9ff;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 0.85em;
+            color: #666;
+        }
+
+        .instrument-selector {
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .instrument-selector.active {
+            display: block;
+        }
+
+        .instrument-selector label {
+            display: block;
+            color: #667eea;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .instrument-selector select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            font-size: 1em;
+            background: white;
+            cursor: pointer;
+        }
+
+        .visualization-mode {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .visualization-mode.active {
+            display: flex;
+        }
+
+        .viz-btn {
+            flex: 1;
+            padding: 10px;
+            background: #e0e0e0;
+            color: #666;
+            border-radius: 10px;
+            font-size: 0.9em;
+        }
+
+        .viz-btn.selected {
+            background: #667eea;
+            color: white;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 250px;
+            padding: 15px;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            resize: vertical;
+            margin-bottom: 15px;
+        }
+
+        .json-editor {
+            margin-bottom: 20px;
+        }
+
+        .json-editor label {
+            display: block;
+            color: #667eea;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .help-text {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            color: #856404;
+            border-left: 4px solid #ffc107;
+        }
+
+        .help-text h3 {
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .help-text code {
+            background: #fff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            display: block;
+            margin: 10px 0;
+            white-space: pre-wrap;
+            font-size: 0.8em;
+        }
+
+        .recording-indicator {
+            display: none;
+            background: #ff4444;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 15px;
+            animation: pulse 1s infinite;
+        }
+
+        .recording-indicator.active {
+            display: block;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .upload-area-small {
+            border: 2px dashed #667eea;
+            border-radius: 10px;
+            padding: 25px;
+            text-align: center;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9ff;
+        }
+
+        .upload-area-small:hover {
+            border-color: #764ba2;
+            background: #f0f1ff;
+        }
+
+        .upload-area-small.dragover {
+            border-color: #764ba2;
+            background: #e8e9ff;
+        }
+
+        .upload-area-small .upload-icon {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .upload-area-small .upload-text {
+            color: #666;
+            font-size: 0.95em;
+        }
+
+        .tempo-info {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 0.85em;
+            color: #1565c0;
+            border-left: 4px solid #2196f3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎹 MIDI Player Pro</h1>
+        
+        <div class="tabs">
+            <button class="tab active" data-tab="player">▶ Плеер</button>
+            <button class="tab" data-tab="export">📤 Экспорт</button>
+            <button class="tab" data-tab="import">📥 Создать</button>
+            <button class="tab" data-tab="record">🎙️ Запись</button>
+        </div>
+
+        <!-- TAB 1: ПЛЕЕР -->
+        <div class="tab-content active" id="player">
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">🎵</div>
+                <div class="upload-text">
+                    Нажмите или перетащите MIDI файл сюда
+                </div>
+            </div>
+            
+            <input type="file" id="fileInput" accept=".mid,.midi">
+            
+            <div class="file-info" id="fileInfo">
+                <div class="file-name" id="fileName"></div>
+                <div class="info-box" id="midiInfo"></div>
+                <div class="tempo-info" id="tempoInfo" style="display: none;"></div>
+            </div>
+
+            <div class="visualizer" id="visualizer">
+                <canvas id="canvas"></canvas>
+                <div class="viz-debug" id="vizDebug">Нот: 0</div>
+            </div>
+
+            <div class="visualization-mode" id="visualizationMode">
+                <button class="viz-btn selected" data-mode="bars">📊 Столбцы</button>
+                <button class="viz-btn" data-mode="wave">🌊 Волна</button>
+                <button class="viz-btn" data-mode="circle">⭕ Круг</button>
+            </div>
+
+            <div class="instrument-selector" id="instrumentSelector">
+                <label for="waveType">🎼 Тип звук��:</label>
+                <select id="waveType">
+                    <option value="sine">Синусоида (мягкий)</option>
+                    <option value="square">Квадрат (резкий)</option>
+                    <option value="sawtooth">Пила (яркий)</option>
+                    <option value="triangle" selected>Треугольник (сбалансированный)</option>
+                </select>
+            </div>
+
+            <div class="slider-control" id="volumeControl">
+                <span class="slider-label">🔊 Громкость:</span>
+                <input type="range" id="volumeSlider" min="0" max="100" value="30">
+                <span class="slider-value" id="volumeValue">30%</span>
+            </div>
+
+            <div class="slider-control" id="tempoControl">
+                <span class="slider-label">⏱️ Темп:</span>
+                <input type="range" id="tempoSlider" min="25" max="300" value="100" step="5">
+                <span class="slider-value" id="tempoValue">100%</span>
+            </div>
+            
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="time-display">
+                    <span id="currentTime">0:00</span>
+                    <span id="totalTime">0:00</span>
+                </div>
+            </div>
+            
+            <div class="controls">
+                <button id="playBtn" disabled>
+                    <span>▶</span> Играть
+                </button>
+                <button id="pauseBtn" disabled>
+                    <span>⏸</span> Пауза
+                </button>
+                <button id="stopBtn" disabled>
+                    <span>⏹</span> Стоп
+                </button>
+            </div>
+            
+            <div class="status" id="status">Загрузите MIDI файл для начала</div>
+        </div>
+
+        <!-- TAB 2: ЭКСПОРТ -->
+        <div class="tab-content" id="export">
+            <div class="help-text">
+                <h3>📤 Экспорт MIDI в JSON/WAV</h3>
+                <p>Загрузите MIDI файл в плеере, затем выберите формат экспорта.</p>
+            </div>
+
+            <div class="controls">
+                <button id="exportJsonBtn" disabled>
+                    <span>📥</span> Экспортировать в JSON
+                </button>
+                <button id="exportWavBtn" class="secondary" disabled>
+                    <span>🎵</span> Экспортировать в WAV
+                </button>
+            </div>
+
+            <div class="json-editor">
+                <label>JSON данные:</label>
+                <textarea id="jsonOutput" placeholder="JSON данные появятся здесь после экспорта..." readonly></textarea>
+            </div>
+
+            <div class="controls">
+                <button id="downloadJsonBtn" class="secondary" disabled>
+                    <span>💾</span> Скачать JSON
+                </button>
+            </div>
+        </div>
+
+        <!-- TAB 3: СОЗДАТЬ MIDI -->
+        <div class="tab-content" id="import">
+            <div class="help-text">
+                <h3>📥 Создание MIDI из JSON</h3>
+                <p>Формат JSON:</p>
+                <code>{"tracks": [{"notes": [{"note": 60, "time": 0, "duration": 0.5, "velocity": 100}]}]}</code>
+                <p style="margin-top: 10px;"><strong>note:</strong> MIDI нота (60 = C4), <strong>time:</strong> время в секундах, <strong>duration:</strong> длительность, <strong>velocity:</strong> громкость (0-127)</p>
+            </div>
+
+            <div class="upload-area-small" id="jsonUploadArea">
+                <div class="upload-icon">📄</div>
+                <div class="upload-text">
+                    Нажмите или перетащите JSON файл сюда
+                </div>
+            </div>
+            
+            <input type="file" id="jsonFileInput" accept=".json">
+
+            <div class="json-editor">
+                <label>Или введите JSON вручную:</label>
+                <textarea id="jsonInput" placeholder='{"tracks": [{"notes": [{"note": 60, "time": 0, "duration": 0.5, "velocity": 100}]}]}'></textarea>
+            </div>
+
+            <div class="controls">
+                <button id="createMidiBtn">
+                    <span>🎵</span> Создать MIDI файл
+                </button>
+                <button id="previewMidiBtn" class="secondary">
+                    <span>▶</span> Предпросмотр
+                </button>
+            </div>
+
+            <div class="status" id="importStatus"></div>
+        </div>
+
+        <!-- TAB 4: ЗАПИСЬ -->
+        <div class="tab-content" id="record">
+            <div class="help-text">
+                <h3>🎙️ Запись в аудио файл</h3>
+                <p>Загрузите MIDI файл в плеере, затем нажмите "Начать запись" и "Играть". После окончания воспроизведения вы сможете скачать аудио файл.</p>
+            </div>
+
+            <div class="recording-indicator" id="recordingIndicator">
+                ⚫ Идет запись...
+            </div>
+
+            <div class="controls">
+                <button id="startRecordBtn" disabled>
+                    <span>⚫</span> Начать запись
+                </button>
+                <button id="stopRecordBtn" disabled>
+                    <span>⏹</span> Остановить запись
+                </button>
+            </div>
+
+            <div class="controls">
+                <button id="downloadAudioBtn" class="secondary" disabled>
+                    <span>💾</span> Скачать аудио (WAV)
+                </button>
+            </div>
+
+            <div class="status" id="recordStatus">Загрузите MIDI файл для начала записи</div>
+        </div>
+    </div>
+
+    <script>
+        // ===== MIDI ПАРСЕР (УЛУЧШЕННЫЙ) =====
+        class MIDIParser {
+            constructor(arrayBuffer) {
+                this.data = new DataView(arrayBuffer);
+                this.pos = 0;
+            }
+
+            readString(length) {
+                let str = '';
+                for (let i = 0; i < length; i++) {
+                    str += String.fromCharCode(this.data.getUint8(this.pos++));
+                }
+                return str;
+            }
+
+            readUInt32() {
+                const val = this.data.getUint32(this.pos);
+                this.pos += 4;
+                return val;
+            }
+
+            readUInt24() {
+                const val = (this.data.getUint8(this.pos) << 16) |
+                           (this.data.getUint8(this.pos + 1) << 8) |
+                            this.data.getUint8(this.pos + 2);
+                this.pos += 3;
+                return val;
+            }
+
+            readUInt16() {
+                const val = this.data.getUint16(this.pos);
+                this.pos += 2;
+                return val;
+            }
+
+            readUInt8() {
+                return this.data.getUint8(this.pos++);
+            }
+
+            readVarLen() {
+                let value = 0;
+                let byte;
+                do {
+                    byte = this.readUInt8();
+                    value = (value << 7) | (byte & 0x7f);
+                } while (byte & 0x80);
+                return value;
+            }
+
+            parse() {
+                const header = this.readString(4);
+                if (header !== 'MThd') {
+                    throw new Error('Неверный MIDI файл');
+                }
+
+                const headerLength = this.readUInt32();
+                const format = this.readUInt16();
+                const trackCount = this.readUInt16();
+                const timeDivision = this.readUInt16();
+
+                // ✅ ИСПРАВЛЕНИЕ: Поддержка SMPTE time division
+                let ticksPerBeat = timeDivision;
+                let isSMPTE = false;
+                let framesPerSecond = 0;
+                let ticksPerFrame = 0;
+
+                if (timeDivision & 0x8000) {
+                    // SMPTE format
+                    isSMPTE = true;
+                    framesPerSecond = -(timeDivision >> 8);
+                    ticksPerFrame = timeDivision & 0xFF;
+                    ticksPerBeat = framesPerSecond * ticksPerFrame; // Приближение
+                }
+
+                const tracks = [];
+                const tempoMap = []; // ✅ ИСПРАВЛЕНИЕ: Карта темпа
+
+                for (let i = 0; i < trackCount; i++) {
+                    const track = this.parseTrack(tempoMap);
+                    if (track.events.length > 0) {
+                        tracks.push(track);
+                    }
+                }
+
+                return { 
+                    format, 
+                    trackCount, 
+                    timeDivision,
+                    ticksPerBeat,
+                    isSMPTE,
+                    framesPerSecond,
+                    ticksPerFrame,
+                    tempoMap, // ✅ Карта темпа
+                    tracks 
+                };
+            }
+
+            parseTrack(tempoMap) {
+                const header = this.readString(4);
+                if (header !== 'MTrk') {
+                    throw new Error('Неверный трек');
+                }
+
+                const trackLength = this.readUInt32();
+                const trackEnd = this.pos + trackLength;
+                const events = [];
+                let runningStatus = 0;
+                let absoluteTime = 0;
+
+                while (this.pos < trackEnd) {
+                    const deltaTime = this.readVarLen();
+                    absoluteTime += deltaTime;
+
+                    let status = this.data.getUint8(this.pos);
+
+                    // ✅ ИСПРАВЛЕНИЕ: Running status для всех событий канала
+                    if (status < 0x80) {
+                        status = runningStatus;
+                    } else {
+                        this.pos++;
+                        // Running status применяется только к событиям канала (0x80-0xEF)
+                        if (status >= 0x80 && status < 0xF0) {
+                            runningStatus = status;
+                        }
+                    }
+
+                    const eventType = status >> 4;
+                    const channel = status & 0x0F;
+
+                    // Note On
+                    if (eventType === 0x9) {
+                        const note = this.readUInt8();
+                        const velocity = this.readUInt8();
+                        if (velocity > 0) {
+                            events.push({ type: 'noteOn', time: absoluteTime, note, velocity, channel });
+                        } else {
+                            events.push({ type: 'noteOff', time: absoluteTime, note, channel });
+                        }
+                    }
+                    // Note Off
+                    else if (eventType === 0x8) {
+                        const note = this.readUInt8();
+                        const velocity = this.readUInt8();
+                        events.push({ type: 'noteOff', time: absoluteTime, note, channel });
+                    }
+                    // ✅ ИСПРАВЛЕНИЕ: Pitch Bend
+                    else if (eventType === 0xE) {
+                        const lsb = this.readUInt8();
+                        const msb = this.readUInt8();
+                        const value = (msb << 7) | lsb; // 0-16383, center = 8192
+                        events.push({ type: 'pitchBend', time: absoluteTime, value, channel });
+                    }
+                    // ✅ ИСПРАВЛЕНИЕ: Program Change
+                    else if (eventType === 0xC) {
+                        const program = this.readUInt8();
+                        events.push({ type: 'programChange', time: absoluteTime, program, channel });
+                    }
+                    // Control Change
+                    else if (eventType === 0xB) {
+                        const controller = this.readUInt8();
+                        const value = this.readUInt8();
+                        events.push({ type: 'controlChange', time: absoluteTime, controller, value, channel });
+                    }
+                    // Channel Pressure
+                    else if (eventType === 0xD) {
+                        const pressure = this.readUInt8();
+                        events.push({ type: 'channelPressure', time: absoluteTime, pressure, channel });
+                    }
+                    // Polyphonic Key Pressure
+                    else if (eventType === 0xA) {
+                        const note = this.readUInt8();
+                        const pressure = this.readUInt8();
+                        events.push({ type: 'polyPressure', time: absoluteTime, note, pressure, channel });
+                    }
+                    // Meta event или SysEx
+                    else if (status === 0xFF || status === 0xF0 || status === 0xF7) {
+                        if (status === 0xFF) {
+                            const metaType = this.readUInt8();
+                            const length = this.readVarLen();
+                            
+                            // ✅ ИСПРАВЛЕНИЕ: Обработка Tempo event (0x51)
+                            if (metaType === 0x51 && length === 3) {
+                                const microsecondsPerBeat = this.readUInt24();
+                                const bpm = 60000000 / microsecondsPerBeat;
+                                tempoMap.push({
+                                    time: absoluteTime,
+                                    microsecondsPerBeat,
+                                    bpm
+                                });
+                                events.push({ 
+                                    type: 'tempo', 
+                                    time: absoluteTime, 
+                                    microsecondsPerBeat,
+                                    bpm
+                                });
+                            } else {
+                                this.pos += length;
+                            }
+                        } else {
+                            const length = this.readVarLen();
+                            this.pos += length;
+                        }
+                    }
+                }
+
+                return { events };
+            }
+        }
+
+        // ===== MIDI WRITER =====
+        class MIDIWriter {
+            constructor() {
+                this.data = [];
+            }
+
+            writeString(str) {
+                for (let i = 0; i < str.length; i++) {
+                    this.data.push(str.charCodeAt(i));
+                }
+            }
+
+            writeUInt32(value) {
+                this.data.push((value >> 24) & 0xFF);
+                this.data.push((value >> 16) & 0xFF);
+                this.data.push((value >> 8) & 0xFF);
+                this.data.push(value & 0xFF);
+            }
+
+            writeUInt16(value) {
+                this.data.push((value >> 8) & 0xFF);
+                this.data.push(value & 0xFF);
+            }
+
+            writeUInt8(value) {
+                this.data.push(value & 0xFF);
+            }
+
+            writeVarLen(value) {
+                const bytes = [];
+                bytes.push(value & 0x7F);
+                value >>= 7;
+                while (value > 0) {
+                    bytes.push((value & 0x7F) | 0x80);
+                    value >>= 7;
+                }
+                for (let i = bytes.length - 1; i >= 0; i--) {
+                    this.data.push(bytes[i]);
+                }
+            }
+
+            createMIDI(jsonData) {
+                this.data = [];
+                
+                this.writeString('MThd');
+                this.writeUInt32(6);
+                this.writeUInt16(1);
+                this.writeUInt16(jsonData.tracks.length);
+                this.writeUInt16(480);
+
+                jsonData.tracks.forEach(track => {
+                    this.writeTrack(track);
+                });
+
+                return new Uint8Array(this.data);
+            }
+
+            writeTrack(track) {
+                const tempWriter = new MIDIWriter();
+                
+                const notes = [...track.notes].sort((a, b) => a.time - b.time);
+                
+                const events = [];
+                notes.forEach(note => {
+                    const startTime = Math.round(note.time * 480);
+                    const endTime = Math.round((note.time + note.duration) * 480);
+                    
+                    events.push({
+                        time: startTime,
+                        type: 'noteOn',
+                        note: note.note,
+                        velocity: note.velocity || 100
+                    });
+                    
+                    events.push({
+                        time: endTime,
+                        type: 'noteOff',
+                        note: note.note
+                    });
+                });
+                
+                events.sort((a, b) => a.time - b.time);
+                
+                let currentTime = 0;
+                events.forEach(event => {
+                    const deltaTime = event.time - currentTime;
+                    tempWriter.writeVarLen(deltaTime);
+                    
+                    if (event.type === 'noteOn') {
+                        tempWriter.writeUInt8(0x90);
+                        tempWriter.writeUInt8(event.note);
+                        tempWriter.writeUInt8(event.velocity);
+                    } else {
+                        tempWriter.writeUInt8(0x80);
+                        tempWriter.writeUInt8(event.note);
+                        tempWriter.writeUInt8(0);
+                    }
+                    
+                    currentTime = event.time;
+                });
+                
+                tempWriter.writeVarLen(0);
+                tempWriter.writeUInt8(0xFF);
+                tempWriter.writeUInt8(0x2F);
+                tempWriter.writeUInt8(0x00);
+                
+                this.writeString('MTrk');
+                this.writeUInt32(tempWriter.data.length);
+                this.data.push(...tempWriter.data);
+            }
+        }
+
+        // ===== VISUALIZER (УЛУЧШЕННЫЙ) =====
+        class Visualizer {
+            constructor(canvas, debugEl) {
+                this.canvas = canvas;
+                this.ctx = canvas.getContext('2d', {
+                    alpha: false,
+                    desynchronized: true
+                });
+                this.ctx.imageSmoothingEnabled = true;
+                this.ctx.imageSmoothingQuality = 'high';
+                this.debugEl = debugEl;
+                this.mode = 'bars';
+                this.activeNotes = new Map();
+                this.bars = new Array(88).fill(0);
+                this.smoothedBars = new Array(88).fill(0);
+                this.noteCount = 0;
+                this.isActive = false;
+                this.lastTime = performance.now();
+                this.frameCount = 0;
+                this.fpsTime = 0;
+                this.fps = 0;
+                this.gradientCache = new Map();
+                this.maxCacheSize = 50;
+                this.TARGET_FRAME_TIME = 16.67;
+                this.resize();
+            }
+
+            resize() {
+                const dpr = window.devicePixelRatio || 1;
+                const rect = this.canvas.getBoundingClientRect();
+                this.canvas.width = rect.width * dpr;
+                this.canvas.height = rect.height * dpr;
+                
+                this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+                this.ctx.scale(dpr, dpr);
+                
+                this.ctx.imageSmoothingEnabled = true;
+                this.ctx.imageSmoothingQuality = 'high';
+                
+                this.width = rect.width;
+                this.height = rect.height;
+                
+                this.gradientCache.clear();
+            }
+
+            setMode(mode) {
+                this.mode = mode;
+            }
+            
+            getOrCreateGradient(key, createFn) {
+                if (!this.gradientCache.has(key)) {
+                    if (this.gradientCache.size >= this.maxCacheSize) {
+                        const firstKey = this.gradientCache.keys().next().value;
+                        this.gradientCache.delete(firstKey);
+                    }
+                    this.gradientCache.set(key, createFn());
+                }
+                return this.gradientCache.get(key);
+            }
+
+            addNote(note, velocity) {
+                this.activeNotes.set(note, {
+                    velocity,
+                    time: Date.now(),
+                    decaying: false
+                });
+                
+                const barIndex = note - 21;
+                if (barIndex >= 0 && barIndex < this.bars.length) {
+                    this.bars[barIndex] = velocity;
+                }
+                
+                this.noteCount++;
+            }
+
+            removeNote(note) {
+                const noteData = this.activeNotes.get(note);
+                if (noteData) {
+                    noteData.decaying = true;
+                    setTimeout(() => {
+                        this.activeNotes.delete(note);
+                    }, 200);
+                }
+            }
+
+            update(deltaTime) {
+                const decayRate = 0.95;
+                const decayFactor = Math.pow(decayRate, deltaTime / this.TARGET_FRAME_TIME);
+                const smoothingFactor = 0.15;
+                
+                for (let i = 0; i < this.bars.length; i++) {
+                    this.smoothedBars[i] += (this.bars[i] - this.smoothedBars[i]) * smoothingFactor;
+                    this.bars[i] *= decayFactor;
+                    if (this.bars[i] < 0.5) this.bars[i] = 0;
+                }
+            }
+
+            draw() {
+                if (!this.isActive) return;
+
+                const currentTime = performance.now();
+                const deltaTime = currentTime - this.lastTime;
+                this.lastTime = currentTime;
+                
+                this.frameCount++;
+                this.fpsTime += deltaTime;
+                if (this.fpsTime >= 1000) {
+                    this.fps = Math.round((this.frameCount * 1000) / this.fpsTime);
+                    this.frameCount = 0;
+                    this.fpsTime = 0;
+                }
+
+                const { width, height } = this;
+                
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.fillRect(0, 0, width, height);
+
+                this.update(deltaTime);
+
+                if (this.debugEl) {
+                    this.debugEl.textContent = `Активных: ${this.activeNotes.size} | Всего: ${this.noteCount} | FPS: ${this.fps}`;
+                }
+
+                if (this.mode === 'bars') {
+                    this.drawBars();
+                } else if (this.mode === 'wave') {
+                    this.drawWave(currentTime);
+                } else if (this.mode === 'circle') {
+                    this.drawCircle();
+                }
+            }
+
+            drawBars() {
+                const { width, height } = this;
+                const barCount = 88;
+                const barWidth = width / barCount;
+                
+                this.ctx.strokeStyle = 'rgba(102, 126, 234, 0.1)';
+                this.ctx.lineWidth = 1;
+                for (let i = 0; i < 4; i++) {
+                    const y = (height / 4) * i;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, y);
+                    this.ctx.lineTo(width, y);
+                    this.ctx.stroke();
+                }
+                
+                for (let i = 0; i < barCount; i++) {
+                    const barHeight = (this.smoothedBars[i] / 127) * height * 0.9;
+                    
+                    if (barHeight > 1) {
+                        const hue = (i / barCount) * 280;
+                        
+                        this.ctx.fillStyle = `hsla(${hue}, 70%, 50%, 0.15)`;
+                        this.ctx.fillRect(i * barWidth + 1, height - barHeight + 3, barWidth - 2, barHeight);
+                        
+                        const gradientKey = `bar-${Math.floor(barHeight / 10)}-${hue}`;
+                        const gradient = this.getOrCreateGradient(gradientKey, () => {
+                            const g = this.ctx.createLinearGradient(0, height - barHeight, 0, height);
+                            g.addColorStop(0, `hsl(${hue}, 85%, 65%)`);
+                            g.addColorStop(1, `hsl(${hue}, 75%, 55%)`);
+                            return g;
+                        });
+                        
+                        this.ctx.fillStyle = gradient;
+                        this.ctx.fillRect(i * barWidth + 1, height - barHeight, barWidth - 2, barHeight);
+                        
+                        this.ctx.fillStyle = `hsla(${hue}, 100%, 85%, 0.8)`;
+                        this.ctx.fillRect(i * barWidth + 1, height - barHeight, barWidth - 2, 3);
+                    }
+                }
+
+                this.activeNotes.forEach((data, note) => {
+                    const barIndex = note - 21;
+                    if (barIndex >= 0 && barIndex < barCount) {
+                        const x = barIndex * barWidth + barWidth / 2;
+                        const hue = (barIndex / barCount) * 280;
+                        
+                        this.ctx.strokeStyle = `hsla(${hue}, 100%, 50%, ${data.decaying ? 0.3 : 0.9})`;
+                        this.ctx.lineWidth = 2;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(x, height);
+                        this.ctx.lineTo(x, 10);
+                        this.ctx.stroke();
+                        
+                        this.ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
+                        this.ctx.beginPath();
+                        this.ctx.arc(x, 10, 4, 0, Math.PI * 2);
+                        this.ctx.fill();
+                    }
+                });
+            }
+
+            drawWave(currentTime) {
+                const { width, height } = this;
+                const centerY = height / 2;
+                
+                this.ctx.strokeStyle = 'rgba(102, 126, 234, 0.2)';
+                this.ctx.lineWidth = 1;
+                this.ctx.beginPath();
+                this.ctx.moveTo(0, centerY);
+                this.ctx.lineTo(width, centerY);
+                this.ctx.stroke();
+                
+                let totalVelocity = 0;
+                this.activeNotes.forEach(data => {
+                    totalVelocity += data.velocity;
+                });
+                const avgVelocity = this.activeNotes.size > 0 ? totalVelocity / this.activeNotes.size : 0;
+                const amplitude = (avgVelocity / 127) * height * 0.35;
+
+                this.ctx.beginPath();
+                this.ctx.lineWidth = 4;
+                
+                const strokeGradient = this.getOrCreateGradient('wave-stroke', () => {
+                    const g = this.ctx.createLinearGradient(0, 0, width, 0);
+                    g.addColorStop(0, '#667eea');
+                    g.addColorStop(0.5, '#764ba2');
+                    g.addColorStop(1, '#f093fb');
+                    return g;
+                });
+                this.ctx.strokeStyle = strokeGradient;
+
+                const points = 150;
+                const step = width / points;
+                const time = currentTime * 0.002;
+                
+                for (let i = 0; i <= points; i++) {
+                    const x = i * step;
+                    const barIndex = Math.floor((i / points) * this.smoothedBars.length);
+                    const barValue = this.smoothedBars[barIndex] / 127;
+                    
+                    const wave1 = Math.sin(i * 0.05 + time) * amplitude * 0.6;
+                    const wave2 = Math.sin(i * 0.1 - time * 1.5) * amplitude * 0.4;
+                    const barInfluence = barValue * height * 0.25;
+                    
+                    const y = centerY + wave1 + wave2 + barInfluence;
+                    
+                    if (i === 0) {
+                        this.ctx.moveTo(x, y);
+                    } else {
+                        this.ctx.lineTo(x, y);
+                    }
+                }
+
+                this.ctx.stroke();
+                
+                this.ctx.lineTo(width, height);
+                this.ctx.lineTo(0, height);
+                this.ctx.closePath();
+                
+                const fillGradientKey = `wave-fill-${Math.floor(amplitude / 10)}`;
+                const fillGradient = this.getOrCreateGradient(fillGradientKey, () => {
+                    const g = this.ctx.createLinearGradient(0, centerY - amplitude, 0, height);
+                    g.addColorStop(0, 'rgba(102, 126, 234, 0.4)');
+                    g.addColorStop(1, 'rgba(118, 75, 162, 0.1)');
+                    return g;
+                });
+                this.ctx.fillStyle = fillGradient;
+                this.ctx.fill();
+
+                this.activeNotes.forEach((data, note) => {
+                    const x = ((note - 21) / 88) * width;
+                    const y = centerY + Math.sin(currentTime * 0.005 + note) * amplitude;
+                    const hue = ((note - 21) / 88) * 280;
+                    
+                    this.ctx.shadowBlur = 15;
+                    this.ctx.shadowColor = `hsl(${hue}, 90%, 60%)`;
+                    
+                    this.ctx.beginPath();
+                    this.ctx.arc(x, y, data.decaying ? 3 : 6, 0, Math.PI * 2);
+                    this.ctx.fillStyle = `hsl(${hue}, 90%, 60%)`;
+                    this.ctx.fill();
+                    
+                    this.ctx.shadowBlur = 0;
+                    this.ctx.shadowColor = 'transparent';
+                });
+            }
+
+            drawCircle() {
+                const { width, height } = this;
+                const centerX = width / 2;
+                const centerY = height / 2;
+                const minRadius = 30;
+                const maxRadius = Math.max(Math.min(width, height) / 2 - 20, minRadius + 10);
+
+                const layers = 4;
+                for (let layer = 0; layer < layers; layer++) {
+                    const radius = minRadius + (maxRadius - minRadius) * ((layer + 1) / layers);
+                    
+                    this.ctx.beginPath();
+                    this.ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                    this.ctx.strokeStyle = `rgba(102, 126, 234, ${0.15 + layer * 0.05})`;
+                    this.ctx.lineWidth = 1;
+                    this.ctx.stroke();
+                }
+
+                this.activeNotes.forEach((data, note) => {
+                    const angle = ((note - 21) / 88) * Math.PI * 2 - Math.PI / 2;
+                    const radius = minRadius + (data.velocity / 127) * (maxRadius - minRadius);
+                    const x = centerX + Math.cos(angle) * radius;
+                    const y = centerY + Math.sin(angle) * radius;
+                    const hue = ((note - 21) / 88) * 280;
+                    
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(centerX, centerY);
+                    this.ctx.lineTo(x, y);
+                    this.ctx.strokeStyle = `hsla(${hue}, 85%, 55%, ${data.decaying ? 0.3 : 0.7})`;
+                    this.ctx.lineWidth = 3;
+                    this.ctx.stroke();
+                    
+                    this.ctx.shadowBlur = data.decaying ? 5 : 20;
+                    this.ctx.shadowColor = `hsl(${hue}, 90%, 60%)`;
+                    
+                    this.ctx.beginPath();
+                    this.ctx.arc(x, y, data.decaying ? 4 : 8, 0, Math.PI * 2);
+                    this.ctx.fillStyle = `hsl(${hue}, 90%, 60%)`;
+                    this.ctx.fill();
+                    
+                    this.ctx.shadowBlur = 0;
+                    this.ctx.shadowColor = 'transparent';
+                });
+
+                const centerRadius = Math.max(25 + (this.activeNotes.size / 8) * 10, 15);
+                this.ctx.beginPath();
+                this.ctx.arc(centerX, centerY, centerRadius, 0, Math.PI * 2);
+                
+                const centerGradient = this.ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, centerRadius);
+                centerGradient.addColorStop(0, '#764ba2');
+                centerGradient.addColorStop(1, '#667eea');
+                this.ctx.fillStyle = centerGradient;
+                this.ctx.fill();
+
+                this.ctx.strokeStyle = '#ffffff';
+                this.ctx.lineWidth = 3;
+                this.ctx.stroke();
+
+                this.ctx.fillStyle = 'white';
+                this.ctx.font = 'bold 18px Arial';
+                this.ctx.textAlign = 'center';
+                this.ctx.textBaseline = 'middle';
+                this.ctx.fillText(this.activeNotes.size, centerX, centerY);
+            }
+
+            start() {
+                this.isActive = true;
+            }
+
+            stop() {
+                this.isActive = false;
+            }
+
+            clear() {
+                this.activeNotes.clear();
+                this.bars.fill(0);
+                this.smoothedBars.fill(0);
+                this.noteCount = 0;
+            }
+        }
+
+        // ===== MIDI ПЛЕЕР (УЛУЧШЕННЫЙ) =====
+        class MIDIPlayer {
+            constructor(visualizer) {
+                this.audioContext = null;
+                this.gainNode = null;
+                this.midiData = null;
+                this.isPlaying = false;
+                this.startTime = 0;
+                this.pausedTime = 0;
+                this.scheduledNotes = new Map();
+                this.scheduledTimeouts = [];
+                this.waveType = 'triangle';
+                this.tempo = 1.0;
+                this.baseDuration = 0;
+                this.visualizer = visualizer;
+                this.mediaRecorder = null;
+                this.recordedChunks = [];
+                this.mediaStreamDestination = null;
+                this.offlineContext = null; // ✅ Для экспорта WAV
+            }
+
+            init() {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                this.gainNode = this.audioContext.createGain();
+                this.gainNode.connect(this.audioContext.destination);
+                this.gainNode.gain.value = 0.3;
+            }
+
+            loadMIDI(arrayBuffer) {
+                const parser = new MIDIParser(arrayBuffer);
+                this.midiData = parser.parse();
+                this.calculateBaseDuration();
+                return this.midiData;
+            }
+
+            // ✅ И��ПРАВЛЕНИЕ: Расчёт длительности с учётом темпа
+            calculateBaseDuration() {
+                let maxTime = 0;
+                const tempoMap = this.midiData.tempoMap || [];
+                const ticksPerBeat = this.midiData.ticksPerBeat;
+                
+                this.midiData.tracks.forEach(track => {
+                    track.events.forEach(event => {
+                        if (event.time > maxTime) maxTime = event.time;
+                    });
+                });
+
+                // Если нет tempo events, используем стандартный темп (120 BPM = 500,000 мкс/бит)
+                if (tempoMap.length === 0) {
+                    this.baseDuration = maxTime * (500000 / 1000000) / ticksPerBeat;
+                } else {
+                    // Рассчитываем с учётом tempo map
+                    let duration = 0;
+                    let lastTick = 0;
+                    let lastTempo = 500000; // Стандартный темп
+
+                    for (let i = 0; i < tempoMap.length; i++) {
+                        const tempoEvent = tempoMap[i];
+                        const tickDelta = tempoEvent.time - lastTick;
+                        duration += (tickDelta / ticksPerBeat) * (lastTempo / 1000000);
+                        lastTick = tempoEvent.time;
+                        lastTempo = tempoEvent.microsecondsPerBeat;
+                    }
+
+                    // Добавляем оставшееся время
+                    const remainingTicks = maxTime - lastTick;
+                    duration += (remainingTicks / ticksPerBeat) * (lastTempo / 1000000);
+                    
+                    this.baseDuration = duration;
+                }
+            }
+
+            midiNoteToFrequency(note) {
+                return 440 * Math.pow(2, (note - 69) / 12);
+            }
+
+            // ✅ ИСПРАВЛЕНИЕ: Расчёт времени с учётом tempo map
+            ticksToSeconds(ticks) {
+                const tempoMap = this.midiData.tempoMap || [];
+                const ticksPerBeat = this.midiData.ticksPerBeat;
+                
+                if (tempoMap.length === 0) {
+                    return (ticks / ticksPerBeat) * (500000 / 1000000);
+                }
+
+                let seconds = 0;
+                let lastTick = 0;
+                let lastTempo = 500000;
+
+                for (let i = 0; i < tempoMap.length; i++) {
+                    const tempoEvent = tempoMap[i];
+                    if (ticks < tempoEvent.time) break;
+                    
+                    const tickDelta = tempoEvent.time - lastTick;
+                    seconds += (tickDelta / ticksPerBeat) * (lastTempo / 1000000);
+                    lastTick = tempoEvent.time;
+                    lastTempo = tempoEvent.microsecondsPerBeat;
+                }
+
+                const remainingTicks = ticks - lastTick;
+                seconds += (remainingTicks / ticksPerBeat) * (lastTempo / 1000000);
+                
+                return seconds;
+            }
+
+            play() {
+                if (!this.audioContext) {
+                    this.init();
+                }
+
+                this.isPlaying = true;
+                this.startTime = this.audioContext.currentTime - this.pausedTime;
+
+                this.scheduleAllNotes();
+            }
+
+            scheduleAllNotes() {
+                this.stopAllNotes();
+                this.clearTimeouts();
+
+                const { tracks } = this.midiData;
+
+                tracks.forEach((track, trackIndex) => {
+                    track.events.forEach(event => {
+                        const eventTimeInSeconds = this.ticksToSeconds(event.time) / this.tempo;
+                        const eventTime = this.startTime + eventTimeInSeconds;
+                        const delay = (eventTime - this.audioContext.currentTime) * 1000;
+
+                        if (delay < 0) return;
+
+                        if (event.type === 'noteOn') {
+                            const timeout = setTimeout(() => {
+                                if (this.isPlaying) {
+                                    this.playNote(event.note, event.velocity, trackIndex);
+                                    if (this.visualizer) {
+                                        this.visualizer.addNote(event.note, event.velocity);
+                                    }
+                                }
+                            }, delay);
+                            this.scheduledTimeouts.push(timeout);
+                        } else if (event.type === 'noteOff') {
+                            const timeout = setTimeout(() => {
+                                if (this.isPlaying) {
+                                    this.stopNote(event.note, trackIndex);
+                                    if (this.visualizer) {
+                                        this.visualizer.removeNote(event.note);
+                                    }
+                                }
+                            }, delay);
+                            this.scheduledTimeouts.push(timeout);
+                        }
+                    });
+                });
+            }
+
+            clearTimeouts() {
+                this.scheduledTimeouts.forEach(timeout => clearTimeout(timeout));
+                this.scheduledTimeouts = [];
+            }
+
+            playNote(midiNote, velocity, trackIndex) {
+                const key = `${midiNote}-${trackIndex}`;
+                
+                if (this.scheduledNotes.has(key)) {
+                    this.stopNote(midiNote, trackIndex);
+                }
+
+                const oscillator = this.audioContext.createOscillator();
+                const noteGain = this.audioContext.createGain();
+
+                oscillator.type = this.waveType;
+                oscillator.frequency.value = this.midiNoteToFrequency(midiNote);
+
+                const volume = (velocity / 127) * 0.3;
+                noteGain.gain.value = volume;
+
+                oscillator.connect(noteGain);
+                
+                if (this.mediaStreamDestination) {
+                    noteGain.connect(this.mediaStreamDestination);
+                }
+                
+                noteGain.connect(this.gainNode);
+
+                // ✅ ИСПРАВЛЕНИЕ: Сохраняем состояние перед start()
+                try {
+                    oscillator.start();
+                    this.scheduledNotes.set(key, { oscillator, noteGain, started: true });
+                } catch (e) {
+                    console.warn('Failed to start oscillator:', e);
+                }
+            }
+
+            stopNote(midiNote, trackIndex) {
+                const key = `${midiNote}-${trackIndex}`;
+                const note = this.scheduledNotes.get(key);
+
+                if (note) {
+                    const { oscillator, noteGain, started } = note;
+                    const now = this.audioContext.currentTime;
+                    
+                    try {
+                        noteGain.gain.setValueAtTime(noteGain.gain.value, now);
+                        noteGain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                        
+                        // ✅ ИСПРАВЛЕНИЕ: Проверка состояния перед stop()
+                        if (started && oscillator.context.state !== 'closed') {
+                            oscillator.stop(now + 0.1);
+                        }
+                    } catch (e) {
+                        // Игнорируем ошибки уже остановленных осцилляторов
+                    }
+                    
+                    // ✅ ИСПРАВЛЕНИЕ: Явное удаление oscillator для предотвращения утечки памяти
+                    setTimeout(() => {
+                        oscillator.disconnect();
+                        noteGain.disconnect();
+                    }, 150);
+                    
+                    this.scheduledNotes.delete(key);
+                }
+            }
+
+            stopAllNotes() {
+                this.scheduledNotes.forEach(({ oscillator, noteGain, started }, key) => {
+                    try {
+                        // ✅ ИСПРАВЛЕНИЕ: Проверка состояния
+                        if (started && oscillator.context.state !== 'closed') {
+                            oscillator.stop();
+                        }
+                        // ✅ Явное отключение
+                        oscillator.disconnect();
+                        noteGain.disconnect();
+                    } catch (e) {
+                        // Игнорируем ошибки
+                    }
+                });
+                this.scheduledNotes.clear();
+                this.clearTimeouts();
+                if (this.visualizer) {
+                    this.visualizer.clear();
+                }
+            }
+
+            pause() {
+                this.isPlaying = false;
+                this.pausedTime = this.audioContext.currentTime - this.startTime;
+                this.stopAllNotes();
+            }
+
+            stop() {
+                this.isPlaying = false;
+                this.pausedTime = 0;
+                this.stopAllNotes();
+            }
+
+            getDuration() {
+                return this.baseDuration / this.tempo;
+            }
+
+            getCurrentTime() {
+                if (!this.audioContext) return 0;
+                return this.audioContext.currentTime - this.startTime;
+            }
+
+            setVolume(value) {
+                if (this.gainNode) {
+                    this.gainNode.gain.value = value;
+                }
+            }
+
+            setWaveType(type) {
+                this.waveType = type;
+            }
+
+            setTempo(tempo) {
+                const wasPlaying = this.isPlaying;
+                if (wasPlaying) {
+                    this.pausedTime = this.getCurrentTime() * (this.tempo / tempo);
+                    this.pause();
+                }
+                this.tempo = tempo;
+                if (wasPlaying) {
+                    this.play();
+                }
+            }
+
+            startRecording() {
+                if (!this.audioContext) {
+                    this.init();
+                }
+
+                this.recordedChunks = [];
+                this.mediaStreamDestination = this.audioContext.createMediaStreamDestination();
+                this.gainNode.connect(this.mediaStreamDestination);
+
+                this.mediaRecorder = new MediaRecorder(this.mediaStreamDestination.stream);
+                
+                this.mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        this.recordedChunks.push(event.data);
+                    }
+                };
+
+                this.mediaRecorder.start();
+                return true;
+            }
+
+            stopRecording() {
+                return new Promise((resolve) => {
+                    if (!this.mediaRecorder) {
+                        resolve(null);
+                        return;
+                    }
+
+                    this.mediaRecorder.onstop = () => {
+                        const blob = new Blob(this.recordedChunks, { type: 'audio/webm' });
+                        resolve(blob);
+                    };
+
+                    this.mediaRecorder.stop();
+                    
+                    if (this.mediaStreamDestination) {
+                        this.gainNode.disconnect(this.mediaStreamDestination);
+                        this.mediaStreamDestination = null;
+                    }
+                });
+            }
+
+            // ✅ НОВОЕ: Экспорт в WAV
+            async exportToWAV() {
+                if (!this.midiData) return null;
+
+                const duration = this.getDuration();
+                const sampleRate = 44100;
+                const numberOfChannels = 2;
+
+                // Создаём offline context
+                this.offlineContext = new OfflineAudioContext(numberOfChannels, sampleRate * duration, sampleRate);
+                
+                const offlineGain = this.offlineContext.createGain();
+                offlineGain.gain.value = 0.3;
+                offlineGain.connect(this.offlineContext.destination);
+
+                const scheduledOscillators = [];
+
+                // Планируем все ноты
+                this.midiData.tracks.forEach((track, trackIndex) => {
+                    track.events.forEach(event => {
+                        const eventTime = this.ticksToSeconds(event.time) / this.tempo;
+
+                        if (event.type === 'noteOn') {
+                            const oscillator = this.offlineContext.createOscillator();
+                            const noteGain = this.offlineContext.createGain();
+
+                            oscillator.type = this.waveType;
+                            oscillator.frequency.value = this.midiNoteToFrequency(event.note);
+
+                            const volume = (event.velocity / 127) * 0.3;
+                            noteGain.gain.value = volume;
+
+                            oscillator.connect(noteGain);
+                            noteGain.connect(offlineGain);
+
+                            oscillator.start(eventTime);
+                            
+                            scheduledOscillators.push({
+                                oscillator,
+                                noteGain,
+                                note: event.note,
+                                trackIndex
+                            });
+                        } else if (event.type === 'noteOff') {
+                            const key = `${event.note}-${trackIndex}`;
+                            const osc = scheduledOscillators.find(o => 
+                                o.note === event.note && o.trackIndex === trackIndex && !o.stopped
+                            );
+                            
+                            if (osc) {
+                                const stopTime = eventTime;
+                                osc.noteGain.gain.setValueAtTime(osc.noteGain.gain.value, stopTime);
+                                osc.noteGain.gain.exponentialRampToValueAtTime(0.01, stopTime + 0.1);
+                                osc.oscillator.stop(stopTime + 0.1);
+                                osc.stopped = true;
+                            }
+                        }
+                    });
+                });
+
+                // Рендерим audio
+                const renderedBuffer = await this.offlineContext.startRendering();
+                
+                // Конвертируем в WAV
+                const wavBlob = this.audioBufferToWav(renderedBuffer);
+                return wavBlob;
+            }
+
+            // Конвертация AudioBuffer в WAV
+            audioBufferToWav(buffer) {
+                const numberOfChannels = buffer.numberOfChannels;
+                const sampleRate = buffer.sampleRate;
+                const format = 1; // PCM
+                const bitDepth = 16;
+
+                const bytesPerSample = bitDepth / 8;
+                const blockAlign = numberOfChannels * bytesPerSample;
+
+                const data = [];
+                for (let i = 0; i < buffer.length; i++) {
+                    for (let channel = 0; channel < numberOfChannels; channel++) {
+                        const sample = buffer.getChannelData(channel)[i];
+                        const intSample = Math.max(-1, Math.min(1, sample));
+                        data.push(intSample < 0 ? intSample * 0x8000 : intSample * 0x7FFF);
+                    }
+                }
+
+                const dataLength = data.length * bytesPerSample;
+                const arrayBuffer = new ArrayBuffer(44 + dataLength);
+                const view = new DataView(arrayBuffer);
+
+                // WAV header
+                this.writeString(view, 0, 'RIFF');
+                view.setUint32(4, 36 + dataLength, true);
+                this.writeString(view, 8, 'WAVE');
+                this.writeString(view, 12, 'fmt ');
+                view.setUint32(16, 16, true);
+                view.setUint16(20, format, true);
+                view.setUint16(22, numberOfChannels, true);
+                view.setUint32(24, sampleRate, true);
+                view.setUint32(28, sampleRate * blockAlign, true);
+                view.setUint16(32, blockAlign, true);
+                view.setUint16(34, bitDepth, true);
+                this.writeString(view, 36, 'data');
+                view.setUint32(40, dataLength, true);
+
+                // Аудио данные
+                let offset = 44;
+                for (let i = 0; i < data.length; i++) {
+                    view.setInt16(offset, data[i], true);
+                    offset += 2;
+                }
+
+                return new Blob([arrayBuffer], { type: 'audio/wav' });
+            }
+
+            writeString(view, offset, string) {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            }
+
+            exportToJSON() {
+                if (!this.midiData) return null;
+
+                const json = {
+                    format: this.midiData.format,
+                    trackCount: this.midiData.trackCount,
+                    timeDivision: this.midiData.timeDivision,
+                    ticksPerBeat: this.midiData.ticksPerBeat,
+                    tempoMap: this.midiData.tempoMap || [],
+                    tracks: []
+                };
+
+                this.midiData.tracks.forEach(track => {
+                    const trackData = { notes: [], events: [] };
+                    const noteOnEvents = new Map();
+
+                    track.events.forEach(event => {
+                        const timeInSeconds = this.ticksToSeconds(event.time);
+
+                        if (event.type === 'noteOn') {
+                            noteOnEvents.set(event.note, {
+                                time: timeInSeconds,
+                                velocity: event.velocity
+                            });
+                        } else if (event.type === 'noteOff') {
+                            const noteOn = noteOnEvents.get(event.note);
+                            if (noteOn) {
+                                trackData.notes.push({
+                                    note: event.note,
+                                    time: noteOn.time,
+                                    duration: timeInSeconds - noteOn.time,
+                                    velocity: noteOn.velocity
+                                });
+                                noteOnEvents.delete(event.note);
+                            }
+                        }
+                        
+                        // Добавляем другие события
+                        if (['tempo', 'programChange', 'controlChange'].includes(event.type)) {
+                            trackData.events.push({
+                                type: event.type,
+                                time: timeInSeconds,
+                                ...event
+                            });
+                        }
+                    });
+
+                    json.tracks.push(trackData);
+                });
+
+                return json;
+            }
+        }
+
+        // ===== UI КОД =====
+        const canvas = document.getElementById('canvas');
+        const vizDebug = document.getElementById('vizDebug');
+        const visualizer = new Visualizer(canvas, vizDebug);
+        const player = new MIDIPlayer(visualizer);
+        
+        let animationFrame = null;
+        let totalDuration = 0;
+        let recordedAudioBlob = null;
+
+        function animateVisualizer() {
+            visualizer.draw();
+            requestAnimationFrame(animateVisualizer);
+        }
+        animateVisualizer();
+
+        // Tabs
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+                
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                tab.classList.add('active');
+                document.getElementById(tabName).classList.add('active');
+            });
+        });
+
+        // Player Tab Elements
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const midiInfo = document.getElementById('midiInfo');
+        const tempoInfo = document.getElementById('tempoInfo');
+        const playBtn = document.getElementById('playBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const status = document.getElementById('status');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const progressFill = document.getElementById('progressFill');
+        const currentTimeEl = document.getElementById('currentTime');
+        const totalTimeEl = document.getElementById('totalTime');
+        const volumeControl = document.getElementById('volumeControl');
+        const volumeSlider = document.getElementById('volumeSlider');
+        const volumeValue = document.getElementById('volumeValue');
+        const tempoControl = document.getElementById('tempoControl');
+        const tempoSlider = document.getElementById('tempoSlider');
+        const tempoValue = document.getElementById('tempoValue');
+        const instrumentSelector = document.getElementById('instrumentSelector');
+        const waveType = document.getElementById('waveType');
+        const visualizerEl = document.getElementById('visualizer');
+        const visualizationMode = document.getElementById('visualizationMode');
+
+        // Export Tab Elements
+        const exportJsonBtn = document.getElementById('exportJsonBtn');
+        const exportWavBtn = document.getElementById('exportWavBtn');
+        const jsonOutput = document.getElementById('jsonOutput');
+        const downloadJsonBtn = document.getElementById('downloadJsonBtn');
+
+        // Import Tab Elements
+        const jsonUploadArea = document.getElementById('jsonUploadArea');
+        const jsonFileInput = document.getElementById('jsonFileInput');
+        const jsonInput = document.getElementById('jsonInput');
+        const createMidiBtn = document.getElementById('createMidiBtn');
+        const previewMidiBtn = document.getElementById('previewMidiBtn');
+        const importStatus = document.getElementById('importStatus');
+
+        // Record Tab Elements
+        const startRecordBtn = document.getElementById('startRecordBtn');
+        const stopRecordBtn = document.getElementById('stopRecordBtn');
+        const downloadAudioBtn = document.getElementById('downloadAudioBtn');
+        const recordStatus = document.getElementById('recordStatus');
+        const recordingIndicator = document.getElementById('recordingIndicator');
+
+        // Visualization mode buttons
+        document.querySelectorAll('.viz-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.viz-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+                visualizer.setMode(btn.dataset.mode);
+            });
+        });
+
+        window.addEventListener('resize', () => visualizer.resize());
+
+        // Upload MIDI file
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) handleFile(file);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) handleFile(file);
+        });
+
+        volumeSlider.addEventListener('input', (e) => {
+            const value = e.target.value;
+            player.setVolume(value / 100);
+            volumeValue.textContent = value + '%';
+        });
+
+        tempoSlider.addEventListener('input', (e) => {
+            const value = e.target.value;
+            player.setTempo(value / 100);
+            tempoValue.textContent = value + '%';
+            
+            if (player.midiData) {
+                totalDuration = player.getDuration();
+                totalTimeEl.textContent = formatTime(totalDuration);
+            }
+        });
+
+        waveType.addEventListener('change', (e) => {
+            player.setWaveType(e.target.value);
+        });
+
+        async function handleFile(file) {
+            if (!file.name.match(/\.(mid|midi)$/i)) {
+                status.textContent = 'Ошибка: выберите MIDI файл';
+                return;
+            }
+
+            try {
+                status.textContent = 'Загрузка файла...';
+                const arrayBuffer = await file.arrayBuffer();
+                
+                const midiData = player.loadMIDI(arrayBuffer);
+                
+                fileName.textContent = `📄 ${file.name}`;
+                
+                let totalNotes = 0;
+                midiData.tracks.forEach(track => {
+                    const notes = track.events.filter(e => e.type === 'noteOn');
+                    totalNotes += notes.length;
+                });
+                
+                totalDuration = player.getDuration();
+                
+                // ✅ Показываем информацию о темпе
+                if (midiData.tempoMap && midiData.tempoMap.length > 0) {
+                    const tempos = midiData.tempoMap.map(t => Math.round(t.bpm)).join(', ');
+                    tempoInfo.textContent = `🎼 Темп: ${tempos} BPM | Такты: ${midiData.ticksPerBeat}`;
+                    tempoInfo.style.display = 'block';
+                } else {
+                    tempoInfo.textContent = '🎼 Темп: 120 BPM (стандартный)';
+                    tempoInfo.style.display = 'block';
+                }
+                
+                midiInfo.textContent = `Длительность: ${formatTime(totalDuration)}, Треков: ${midiData.tracks.length}, Нот: ${totalNotes}`;
+                fileInfo.classList.add('active');
+                progressContainer.classList.add('active');
+                volumeControl.classList.add('active');
+                tempoControl.classList.add('active');
+                instrumentSelector.classList.add('active');
+                visualizerEl.classList.add('active');
+                visualizationMode.classList.add('active');
+                
+                playBtn.disabled = false;
+                totalTimeEl.textContent = formatTime(totalDuration);
+                status.textContent = 'Файл загружен! Нажмите "Играть" ▶';
+                
+                exportJsonBtn.disabled = false;
+                exportWavBtn.disabled = false;
+                startRecordBtn.disabled = false;
+                recordStatus.textContent = 'Готов к записи';
+                
+                visualizer.start();
+                
+            } catch (error) {
+                status.textContent = 'Ошибка при чтении MIDI файла: ' + error.message;
+                console.error('Ошибка:', error);
+            }
+        }
+
+        playBtn.addEventListener('click', () => {
+            player.play();
+            
+            playBtn.disabled = true;
+            pauseBtn.disabled = false;
+            stopBtn.disabled = false;
+            status.textContent = '🎵 Воспроизведение...';
+            
+            updateProgress();
+        });
+
+        pauseBtn.addEventListener('click', () => {
+            player.pause();
+            
+            playBtn.disabled = false;
+            pauseBtn.disabled = true;
+            status.textContent = '⏸ Пауза';
+        });
+
+        stopBtn.addEventListener('click', () => {
+            player.stop();
+            
+            progressFill.style.width = '0%';
+            currentTimeEl.textContent = '0:00';
+            
+            playBtn.disabled = false;
+            pauseBtn.disabled = true;
+            stopBtn.disabled = true;
+            status.textContent = 'Остановлено';
+        });
+
+        function updateProgress() {
+            if (!player.isPlaying) return;
+            
+            const elapsed = player.getCurrentTime();
+            const progress = Math.min((elapsed / totalDuration) * 100, 100);
+            
+            progressFill.style.width = progress + '%';
+            currentTimeEl.textContent = formatTime(elapsed);
+            
+            if (progress >= 100) {
+                stopBtn.click();
+                status.textContent = 'Воспроизведение завершено ✓';
+                
+                if (player.mediaRecorder && player.mediaRecorder.state === 'recording') {
+                    stopRecordBtn.click();
+                }
+            } else {
+                requestAnimationFrame(updateProgress);
+            }
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // ЭКСПОРТ В JSON
+        exportJsonBtn.addEventListener('click', () => {
+            const json = player.exportToJSON();
+            if (json) {
+                jsonOutput.value = JSON.stringify(json, null, 2);
+                downloadJsonBtn.disabled = false;
+            }
+        });
+
+        // ✅ НОВОЕ: Экспорт в WAV
+        exportWavBtn.addEventListener('click', async () => {
+            exportWavBtn.disabled = true;
+            exportWavBtn.innerHTML = '<span>⏳</span> Рендеринг...';
+            
+            try {
+                const wavBlob = await player.exportToWAV();
+                
+                if (wavBlob) {
+                    const url = URL.createObjectURL(wavBlob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'midi-export.wav';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    
+                    status.textContent = '✅ WAV файл экспортирован!';
+                }
+            } catch (error) {
+                status.textContent = '❌ Ошибка экспорта: ' + error.message;
+            } finally {
+                exportWavBtn.disabled = false;
+                exportWavBtn.innerHTML = '<span>🎵</span> Экспортировать в WAV';
+            }
+        });
+
+        downloadJsonBtn.addEventListener('click', () => {
+            const json = jsonOutput.value;
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'midi-export.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        // ЗАГРУЗКА JSON ФАЙЛА
+        jsonUploadArea.addEventListener('click', () => jsonFileInput.click());
+
+        jsonUploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            jsonUploadArea.classList.add('dragover');
+        });
+
+        jsonUploadArea.addEventListener('dragleave', () => {
+            jsonUploadArea.classList.remove('dragover');
+        });
+
+        jsonUploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            jsonUploadArea.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) handleJsonFile(file);
+        });
+
+        jsonFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) handleJsonFile(file);
+        });
+
+        async function handleJsonFile(file) {
+            if (!file.name.match(/\.json$/i)) {
+                importStatus.textContent = '❌ Ошибка: выберите JSON файл';
+                importStatus.style.color = 'red';
+                return;
+            }
+
+            try {
+                const text = await file.text();
+                jsonInput.value = text;
+                
+                JSON.parse(text);
+                
+                importStatus.textContent = `✅ Файл "${file.name}" загружен! Нажмите "Создать MIDI" или "Предпросмотр"`;
+                importStatus.style.color = 'green';
+            } catch (error) {
+                importStatus.textContent = '❌ Ошибка чтения файла: ' + error.message;
+                importStatus.style.color = 'red';
+            }
+        }
+
+        // СОЗДАНИЕ MIDI ИЗ JSON
+        createMidiBtn.addEventListener('click', () => {
+            try {
+                const json = JSON.parse(jsonInput.value);
+                
+                if (!json.tracks || !Array.isArray(json.tracks)) {
+                    throw new Error('JSON должен содержать массив tracks');
+                }
+
+                const writer = new MIDIWriter();
+                const midiData = writer.createMIDI(json);
+                
+                const blob = new Blob([midiData], { type: 'audio/midi' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'created-midi.mid';
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                importStatus.textContent = '✅ MIDI файл успешно создан и скачан!';
+                importStatus.style.color = 'green';
+            } catch (error) {
+                importStatus.textContent = '❌ Ошибка: ' + error.message;
+                importStatus.style.color = 'red';
+            }
+        });
+
+        previewMidiBtn.addEventListener('click', async () => {
+            try {
+                const json = JSON.parse(jsonInput.value);
+                
+                if (!json.tracks || !Array.isArray(json.tracks)) {
+                    throw new Error('JSON должен содержать массив tracks');
+                }
+
+                const writer = new MIDIWriter();
+                const midiData = writer.createMIDI(json);
+                
+                const arrayBuffer = midiData.buffer;
+                const loadedData = player.loadMIDI(arrayBuffer);
+                
+                totalDuration = player.getDuration();
+                
+                importStatus.textContent = '✅ MIDI загруже��! Переключитесь на вкладку "Плеер"';
+                importStatus.style.color = 'green';
+                
+                fileInfo.classList.add('active');
+                progressContainer.classList.add('active');
+                volumeControl.classList.add('active');
+                tempoControl.classList.add('active');
+                instrumentSelector.classList.add('active');
+                visualizerEl.classList.add('active');
+                visualizationMode.classList.add('active');
+                
+                fileName.textContent = '📄 Созданный MIDI';
+                let totalNotes = 0;
+                loadedData.tracks.forEach(track => {
+                    const notes = track.events.filter(e => e.type === 'noteOn');
+                    totalNotes += notes.length;
+                });
+                midiInfo.textContent = `Длительность: ${formatTime(totalDuration)}, Треков: ${loadedData.tracks.length}, Нот: ${totalNotes}`;
+                
+                playBtn.disabled = false;
+                totalTimeEl.textContent = formatTime(totalDuration);
+                exportJsonBtn.disabled = false;
+                exportWavBtn.disabled = false;
+                startRecordBtn.disabled = false;
+                
+                visualizer.start();
+            } catch (error) {
+                importStatus.textContent = '❌ Ошибка: ' + error.message;
+                importStatus.style.color = 'red';
+            }
+        });
+
+        // ЗАПИСЬ В АУДИО
+        startRecordBtn.addEventListener('click', () => {
+            player.startRecording();
+            
+            recordingIndicator.classList.add('active');
+            startRecordBtn.disabled = true;
+            stopRecordBtn.disabled = false;
+            recordStatus.textContent = '⚫ Запись началась! Нажмите "Играть"';
+            
+            document.querySelector('.tab[data-tab="player"]').click();
+        });
+
+        stopRecordBtn.addEventListener('click', async () => {
+            const blob = await player.stopRecording();
+            
+            if (blob) {
+                // Конвертируем WebM в WAV
+                const audioContext = new AudioContext();
+                const arrayBuffer = await blob.arrayBuffer();
+                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                
+                // Используем метод из player
+                const wavBlob = player.audioBufferToWav(audioBuffer);
+                
+                recordedAudioBlob = wavBlob;
+                downloadAudioBtn.disabled = false;
+                recordStatus.textContent = '✅ Запись завершена! Нажмите "Скачать аудио"';
+            }
+            
+            recordingIndicator.classList.remove('active');
+            startRecordBtn.disabled = false;
+            stopRecordBtn.disabled = true;
+        });
+
+        downloadAudioBtn.addEventListener('click', () => {
+            if (recordedAudioBlob) {
+                const url = URL.createObjectURL(recordedAudioBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'midi-recording.wav';
+                a.click();
+                URL.revokeObjectURL(url);
+                
+                recordStatus.textContent = '✅ Аудио файл скачан!';
+            }
+        });
+    </script>
+</body>
+</html>
